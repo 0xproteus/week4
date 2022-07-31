@@ -1,13 +1,54 @@
 import detectEthereumProvider from "@metamask/detect-provider"
 import { Strategy, ZkIdentity } from "@zk-kit/identity"
 import { generateMerkleProof, Semaphore } from "@zk-kit/protocols"
-import { providers } from "ethers"
+import { providers, Contract, utils } from "ethers"
 import Head from "next/head"
 import React from "react"
+import { useEffect } from "react"
 import styles from "../styles/Home.module.css"
+import { useForm, SubmitHandler } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from '@hookform/resolvers/yup';
+
+import Greeter from "artifacts/contracts/Greeters.sol/Greeters.json"
+
+const contract = new Contract("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512", Greeter.abi)
+const provider = new providers.JsonRpcProvider("http://127.0.0.1:8545/")
+const contractOwner = contract.connect(provider.getSigner())
+
+interface IFormInput {
+    name: string;
+    address: string;
+    age: number;
+}
+
+const userSchema = yup.object({
+    name: yup.string().required(),
+    age: yup.number().required().positive().integer(),
+    address: yup.string().required(),
+
+}).required();
 
 export default function Home() {
     const [logs, setLogs] = React.useState("Connect your wallet and greet!")
+
+    const {
+        register,
+        handleSubmit,
+        watch,
+        formState: { errors }
+    } = useForm({
+        resolver: yupResolver(userSchema)
+    });
+    const onSubmit = (data: any) => {
+        alert(JSON.stringify(data));
+
+    };
+
+    contractOwner.on("NewGreeting", (result) => {
+        alert(utils.parseBytes32String(result));
+
+    })
 
     async function greet() {
         setLogs("Creating your Semaphore identity...")
@@ -70,7 +111,23 @@ export default function Home() {
             <main className={styles.main}>
                 <h1 className={styles.title}>Greetings</h1>
 
-                <p className={styles.description}>A simple Next.js/Hardhat privacy application with Semaphore.</p>
+                <form onSubmit={handleSubmit(onSubmit)}>
+                    <label>Name</label>
+                    <input
+                        {...register("name")}
+                    />
+                    <p>{errors.name?.message}</p>
+
+                    <label>Address</label>
+                    <input {...register("address", { pattern: /^[A-Za-z]+$/i })} />
+                    <p>{errors.address?.message}</p>
+
+                    <label>Age</label>
+                    <input {...register("age", { min: 18, max: 99 })} />
+                    <p>{errors.age?.message}</p>
+
+                    <input type="submit" />
+                </form>
 
                 <div className={styles.logs}>{logs}</div>
 
